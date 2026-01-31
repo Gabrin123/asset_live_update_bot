@@ -30,7 +30,26 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN', '8355694996:AAE5aAFeeA1kFYiQIIe0coD_JdQQ
 CHAT_ID = os.environ.get('CHAT_ID', '-5232036612')
 
 def get_silver_price():
-    """Get current silver price from Yahoo Finance"""
+    """Get real-time silver price from Kitco"""
+    try:
+        # Try Kitco first (real-time spot price)
+        url = "https://www.kitco.com/market/silver"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            import re
+            # Look for spot price in the page
+            matches = re.findall(r'Spot.*?(\d{2,3}\.\d{2})', response.text)
+            if matches:
+                price = float(matches[0])
+                if 20 < price < 100:
+                    print(f"   Kitco: ${price:.2f}")
+                    return price
+    except:
+        pass
+    
+    # Fallback to Yahoo Finance
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1m&range=1d"
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -41,13 +60,31 @@ def get_silver_price():
             quotes = data['chart']['result'][0]['indicators']['quote'][0]
             close_prices = [p for p in quotes['close'] if p is not None]
             if close_prices:
+                print(f"   Yahoo: ${close_prices[-1]:.2f}")
                 return close_prices[-1]
     except:
         pass
     return None
 
 def get_gold_price():
-    """Get current gold price"""
+    """Get real-time gold price"""
+    try:
+        # Try Kitco
+        url = "https://www.kitco.com/market/gold"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            import re
+            matches = re.findall(r'Spot.*?(\d{3,4}\.\d{2})', response.text)
+            if matches:
+                price = float(matches[0])
+                if 1500 < price < 3000:
+                    return price
+    except:
+        pass
+    
+    # Fallback
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d"
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -64,7 +101,20 @@ def get_gold_price():
     return None
 
 def get_bitcoin_price():
-    """Get current Bitcoin price"""
+    """Get real-time Bitcoin price from CoinGecko"""
+    try:
+        # CoinGecko free API
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            price = data['bitcoin']['usd']
+            return price
+    except:
+        pass
+    
+    # Fallback
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=1m&range=1d"
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -81,7 +131,20 @@ def get_bitcoin_price():
     return None
 
 def get_monero_price():
-    """Get current Monero price"""
+    """Get real-time Monero price from CoinGecko"""
+    try:
+        # CoinGecko free API
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=monero&vs_currencies=usd"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            price = data['monero']['usd']
+            return price
+    except:
+        pass
+    
+    # Fallback
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/XMR-USD?interval=1m&range=1d"
         headers = {'User-Agent': 'Mozilla/5.0'}
