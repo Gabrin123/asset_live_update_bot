@@ -135,21 +135,56 @@ def send_message_to_telegram(message):
         return False
 
 def get_silver_price():
-    """Get current silver price from Yahoo Finance"""
+    """Get current silver price from multiple sources"""
+    
+    # Try Yahoo Finance first
     try:
+        print("   Trying Yahoo Finance...")
         url = "https://query1.finance.yahoo.com/v8/finance/chart/SI=F"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
             price = data['chart']['result'][0]['meta']['regularMarketPrice']
+            print(f"   ✓ Yahoo Finance: ${price:.2f}")
             return price
-            
-        return None
-        
     except Exception as e:
-        print(f"✗ Error fetching price: {e}")
-        return None
+        print(f"   ✗ Yahoo Finance failed: {e}")
+    
+    # Try alternative API
+    try:
+        print("   Trying MetalPriceAPI.com...")
+        url = "https://api.metalpriceapi.com/v1/latest?api_key=demo&base=USD&currencies=XAG"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Convert from oz to standard price
+            xag_rate = data['rates']['XAG']
+            price = 1 / xag_rate  # Convert rate to price per oz
+            print(f"   ✓ MetalPriceAPI: ${price:.2f}")
+            return price
+    except Exception as e:
+        print(f"   ✗ MetalPriceAPI failed: {e}")
+    
+    # Try GoldAPI
+    try:
+        print("   Trying GoldAPI.io...")
+        url = "https://www.goldapi.io/api/XAG/USD"
+        headers = {"x-access-token": "goldapi-demo"}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            price = data['price']
+            print(f"   ✓ GoldAPI: ${price:.2f}")
+            return price
+    except Exception as e:
+        print(f"   ✗ GoldAPI failed: {e}")
+    
+    # All sources failed
+    print("   ✗ All price sources failed")
+    return None
 
 def job():
     """Main job - get price and send chart"""
@@ -163,20 +198,24 @@ def job():
         price = get_silver_price()
         
         if not price:
-            print("⚠ Could not fetch price, skipping this cycle")
-            send_message_to_telegram("⚠️ Could not fetch silver price this cycle")
-            return
-        
-        print(f"💰 Current Silver Price: ${price:.2f}")
+            print("⚠ Could not fetch price, will send chart without price")
+            price = 0.00  # Placeholder
+            
+        if price > 0:
+            print(f"💰 Current Silver Price: ${price:.2f}")
+        else:
+            print("⚠ Using placeholder price")
         
         # Capture chart screenshot
         screenshot_path = get_chart_screenshot()
         
         if screenshot_path and os.path.exists(screenshot_path):
             # Send photo with price as caption
+            price_text = f"${price:.2f}" if price > 0 else "Price unavailable"
+            
             caption = f"""📊 <b>Silver (XAG/USD) - 4 Hour Chart</b>
 
-💰 Current Price: <b>${price:.2f}</b>
+💰 Current Price: <b>{price_text}</b>
 🕐 Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 <a href="https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240">📈 View Live Chart on TradingView</a>
