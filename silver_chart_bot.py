@@ -159,9 +159,19 @@ def job():
     print(f"UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print('='*60)
     
+    # Fetch all prices ONCE at the start
+    print("\n📊 Fetching prices...")
+    silver_price = get_silver_price()
+    gold_price = get_gold_price()
+    btc_price = get_bitcoin_price()
+    xmr_price = get_monero_price()
+    print(f"   Silver: ${silver_price:.2f}" if silver_price else "   Silver: Failed")
+    print(f"   Gold: ${gold_price:,.2f}" if gold_price else "   Gold: Failed")
+    print(f"   Bitcoin: ${btc_price:,.0f}" if btc_price else "   Bitcoin: Failed")
+    print(f"   Monero: ${xmr_price:,.2f}" if xmr_price else "   Monero: Failed")
+    
     # 1. SILVER
     print("\n1/4 Processing Silver...")
-    silver_price = get_silver_price()
     silver_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240", "silver")
     
     if silver_path:
@@ -176,7 +186,6 @@ def job():
     
     # 2. GOLD
     print("\n2/4 Processing Gold...")
-    gold_price = get_gold_price()
     gold_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=OANDA:XAUUSD&interval=240", "gold")
     
     if gold_path:
@@ -191,7 +200,6 @@ def job():
     
     # 3. BITCOIN
     print("\n3/4 Processing Bitcoin...")
-    btc_price = get_bitcoin_price()
     btc_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=BITSTAMP:BTCUSD&interval=240", "bitcoin")
     
     if btc_path:
@@ -206,7 +214,6 @@ def job():
     
     # 4. MONERO
     print("\n4/4 Processing Monero...")
-    xmr_price = get_monero_price()
     xmr_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=KRAKEN:XMRUSD&interval=240", "monero")
     
     if xmr_path:
