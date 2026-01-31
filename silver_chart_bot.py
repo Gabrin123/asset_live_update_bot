@@ -101,45 +101,96 @@ def get_chart_screenshot():
         print("   Waiting 15 seconds for chart and price to fully load...")
         time.sleep(15)
         
-        # Try to find and extract the price element
+        # Try multiple methods to extract the price
         try:
-            print("   🔍 Looking for price element...")
+            print("   🔍 Method 1: Looking for price in page text...")
             
-            # TradingView price is usually in elements with these selectors
-            price_selectors = [
-                "div[class*='last']",
-                "div[class*='price']",
-                "[data-name='legend-source-item']",
-                "div[class*='valueValue']",
-            ]
+            # Get all text on page
+            body_text = driver.find_element("tag name", "body").text
             
-            for selector in price_selectors:
-                try:
-                    elements = driver.find_elements("css selector", selector)
-                    for element in elements:
-                        text = element.text.strip()
-                        # Look for price pattern
-                        import re
-                        matches = re.findall(r'(\d{2,3}\.\d{2,4})', text)
-                        if matches:
-                            for match in matches:
-                                price = float(match)
-                                if 20 < price < 100:  # Silver range
-                                    extracted_price = price
-                                    print(f"   ✓ Found price element: ${price:.2f}")
-                                    break
-                        if extracted_price:
-                            break
-                except:
-                    continue
-                if extracted_price:
-                    break
-                    
-            if not extracted_price:
-                print("   ⚠ Could not find price element, will use API price")
+            import re
+            # Find all numbers that could be silver price
+            matches = re.findall(r'(\d{2,3}\.\d{2,4})', body_text)
+            
+            print(f"   Found {len(matches)} potential prices in page text")
+            
+            # Look for prices in silver range
+            candidate_prices = []
+            for match in matches:
+                price = float(match)
+                if 20 < price < 100:  # Silver range
+                    candidate_prices.append(price)
+            
+            if candidate_prices:
+                # Use the most common price (likely the current one)
+                from collections import Counter
+                price_counts = Counter(candidate_prices)
+                most_common = price_counts.most_common(1)[0][0]
+                extracted_price = most_common
+                print(f"   ✓ Extracted price from page text: ${extracted_price:.2f}")
+                print(f"   (Found {len(candidate_prices)} silver-range prices, using most common)")
                     
         except Exception as e:
-            print(f"   ⚠ Price element extraction failed: {e}")
+            print(f"   ✗ Method 1 failed: {type(e).__name__}: {str(e)[:100]}")
+        
+        # Method 2: Try to find specific elements
+        if not extracted_price:
+            try:
+                print("   🔍 Method 2: Looking for price elements...")
+                
+                # Try finding any div with a price-like pattern
+                all_divs = driver.find_elements("tag name", "div")
+                
+                for div in all_divs[:200]:  # Check first 200 divs
+                    try:
+                        text = div.text.strip()
+                        if text:
+                            import re
+                            matches = re.findall(r'^(\d{2,3}\.\d{2,4})$', text)
+                            if matches:
+                                price = float(matches[0])
+                                if 20 < price < 100:
+                                    extracted_price = price
+                                    print(f"   ✓ Found price in div element: ${price:.2f}")
+                                    break
+                    except:
+                        continue
+                        
+            except Exception as e:
+                print(f"   ✗ Method 2 failed: {type(e).__name__}: {str(e)[:100]}")
+        
+        # Method 3: Search page source
+        if not extracted_price:
+            try:
+                print("   🔍 Method 3: Searching page source...")
+                
+                page_source = driver.page_source
+                import re
+                
+                # Look for JSON-like price data
+                patterns = [
+                    r'"price["\']?\s*:\s*(\d{2,3}\.\d{2,4})',
+                    r'"last["\']?\s*:\s*(\d{2,3}\.\d{2,4})',
+                    r'"close["\']?\s*:\s*(\d{2,3}\.\d{2,4})',
+                ]
+                
+                for pattern in patterns:
+                    matches = re.findall(pattern, page_source)
+                    if matches:
+                        for match in matches:
+                            price = float(match)
+                            if 20 < price < 100:
+                                extracted_price = price
+                                print(f"   ✓ Found price in page source: ${price:.2f}")
+                                break
+                    if extracted_price:
+                        break
+                        
+            except Exception as e:
+                print(f"   ✗ Method 3 failed: {type(e).__name__}: {str(e)[:100]}")
+        
+        if not extracted_price:
+            print("   ⚠ All extraction methods failed - will use API price")
         
         # Take screenshot
         screenshot_path = '/tmp/silver_chart.png'
@@ -329,21 +380,22 @@ def job():
         # Capture chart screenshot (returns screenshot_path AND extracted price)
         screenshot_path, chart_price = get_chart_screenshot()
         
-        # Use chart price if available, otherwise API price
+        # Use chart price if available, otherwise API price with disclaimer
         if chart_price:
             price_text = f"${chart_price:.2f}"
-            print(f"💰 Using exact price from TradingView: ${chart_price:.2f}")
+            price_note = ""
         elif price:
-            price_text = f"${price:.2f}"
-            print(f"💰 Using API price: ${price:.2f}")
+            price_text = f"~${price:.2f}"
+            price_note = " (approximate - see chart for exact)"
         else:
-            price_text = "~$30-32 (see chart)"
-            print(f"   Using placeholder: {price_text}")
+            price_text = "See chart"
+            price_note = ""
         
         if screenshot_path and os.path.exists(screenshot_path):
-            # Send photo with simple caption (price visible in chart)
+            # Send photo with price in caption
             caption = f"""📊 <b>Silver (XAG/USD) - 4 Hour Chart</b>
 
+💰 Price: <b>{price_text}</b>{price_note}
 🕐 Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 <a href="https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240">📈 View Live Chart on TradingView</a>
