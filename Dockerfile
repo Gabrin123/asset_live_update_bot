@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     unzip \
     curl \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Chrome Stable
