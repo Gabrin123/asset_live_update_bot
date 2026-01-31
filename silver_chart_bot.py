@@ -44,33 +44,50 @@ def get_chart_screenshot():
     driver = None
     
     try:
+        print("   Starting Chrome...")
         driver = webdriver.Chrome(options=chrome_options)
+        print("   ✓ Chrome started")
         
         # TradingView Silver 4H chart URL
         url = "https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240"
         
         print(f"   Loading {url}")
         driver.get(url)
+        print("   ✓ Page loaded")
         
         # Wait for chart to load
-        print("   Waiting for chart to render...")
-        time.sleep(12)  # Give it time to fully load
+        print("   Waiting 12 seconds for chart to render...")
+        time.sleep(12)
         
         # Take screenshot
         screenshot_path = '/tmp/silver_chart.png'
+        print(f"   Taking screenshot to {screenshot_path}")
         driver.save_screenshot(screenshot_path)
         
-        print(f"   ✓ Screenshot saved!")
-        
-        return screenshot_path
+        # Verify file was created
+        if os.path.exists(screenshot_path):
+            file_size = os.path.getsize(screenshot_path)
+            print(f"   ✓ Screenshot saved! Size: {file_size} bytes")
+            return screenshot_path
+        else:
+            print("   ✗ Screenshot file not found!")
+            return None
         
     except Exception as e:
-        print(f"   ✗ Error: {e}")
+        print(f"   ✗ Error: {type(e).__name__}: {str(e)}")
+        import traceback
+        print(f"   Traceback: {traceback.format_exc()}")
         return None
         
     finally:
         if driver:
-            driver.quit()
+            print("   Closing Chrome...")
+            try:
+                driver.quit()
+                print("   ✓ Chrome closed")
+            except:
+                print("   ⚠ Error closing Chrome")
+                pass
 
 def send_photo_to_telegram(image_path, caption):
     """Send photo to Telegram chat"""
@@ -136,44 +153,49 @@ def get_silver_price():
 
 def job():
     """Main job - get price and send chart"""
-    print(f"\n{'='*70}")
-    print(f"🔔 SILVER UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print('='*70)
-    
-    # Get current silver price
-    price = get_silver_price()
-    
-    if not price:
-        print("⚠ Could not fetch price, skipping this cycle")
-        return
-    
-    print(f"💰 Current Silver Price: ${price:.2f}")
-    
-    # Capture chart screenshot
-    screenshot_path = get_chart_screenshot()
-    
-    if screenshot_path and os.path.exists(screenshot_path):
-        # Send photo with price as caption
-        caption = f"""📊 <b>Silver (XAG/USD) - 4 Hour Chart</b>
+    try:
+        print(f"\n{'='*70}")
+        print(f"🔔 SILVER UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print('='*70)
+        
+        # Get current silver price
+        print("💰 Fetching silver price...")
+        price = get_silver_price()
+        
+        if not price:
+            print("⚠ Could not fetch price, skipping this cycle")
+            send_message_to_telegram("⚠️ Could not fetch silver price this cycle")
+            return
+        
+        print(f"💰 Current Silver Price: ${price:.2f}")
+        
+        # Capture chart screenshot
+        screenshot_path = get_chart_screenshot()
+        
+        if screenshot_path and os.path.exists(screenshot_path):
+            # Send photo with price as caption
+            caption = f"""📊 <b>Silver (XAG/USD) - 4 Hour Chart</b>
 
 💰 Current Price: <b>${price:.2f}</b>
 🕐 Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 <a href="https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240">📈 View Live Chart on TradingView</a>
 """
-        
-        send_photo_to_telegram(screenshot_path, caption)
-        
-        # Clean up
-        try:
-            os.remove(screenshot_path)
-        except:
-            pass
-    else:
-        # Fallback: send text message if screenshot fails
-        print("⚠ Screenshot failed, sending text message instead")
-        
-        message = f"""📊 <b>Silver Price Update</b>
+            
+            print("📤 Sending chart to Telegram...")
+            send_photo_to_telegram(screenshot_path, caption)
+            
+            # Clean up
+            try:
+                os.remove(screenshot_path)
+                print("🗑️  Cleaned up screenshot file")
+            except:
+                pass
+        else:
+            # Fallback: send text message if screenshot fails
+            print("⚠ Screenshot failed, sending text message instead")
+            
+            message = f"""📊 <b>Silver Price Update</b>
 
 💰 Current Price: <b>${price:.2f}</b>
 🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
@@ -182,10 +204,16 @@ def job():
 
 <i>(Chart screenshot temporarily unavailable)</i>
 """
+            
+            send_message_to_telegram(message)
         
-        send_message_to_telegram(message)
-    
-    print("✓ Update complete\n")
+        print("✓ Update complete\n")
+        
+    except Exception as e:
+        print(f"❌ ERROR in job(): {type(e).__name__}: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        send_message_to_telegram(f"❌ Error in silver bot: {str(e)}")
 
 def main():
     """Main function to run the bot"""
