@@ -207,10 +207,14 @@ def main():
     # Wait for Flask to start
     time.sleep(2)
     
-    # Send startup message
-    send_message_to_telegram("🤖 <b>Silver Chart Bot is now active!</b>\n\n📊 Sending TradingView 4H chart screenshots every 3 minutes\n💰 Current price included with each update")
+    # Send startup message IMMEDIATELY (before first chart)
+    print("📱 Sending startup notification...")
+    send_message_to_telegram("🤖 <b>Silver Chart Bot is now active!</b>\n\n📊 First chart coming in 30 seconds...\n💰 Then updates every 3 minutes")
     
-    # Run immediately on start
+    print("✓ Bot is ready, starting first chart capture...\n")
+    
+    # Run first job after startup message sent
+    time.sleep(5)  # Small delay to ensure startup message sent first
     job()
     
     # Schedule to run every 3 minutes
