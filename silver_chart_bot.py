@@ -235,11 +235,11 @@ def job():
     
     # 1. SILVER
     print("\n1/4 Processing Silver...")
-    silver_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240", "silver")
+    silver_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240&studies_overrides=%7B%22RSI.plot%22%3A%7B%22display%22%3A15%7D%7D", "silver")
     
     if silver_path:
         price_text = f"~${silver_price:.2f} (see chart)" if silver_price else "See chart"
-        caption = f"""📊 <b>Silver (XAG/USD) - 4H</b>
+        caption = f"""📊 <b>Silver (XAG/USD) - 4H + RSI</b>
 
 💰 Price: <b>{price_text}</b>
 🕐 {datetime.now().strftime('%H:%M UTC')}"""
@@ -249,11 +249,11 @@ def job():
     
     # 2. GOLD
     print("\n2/4 Processing Gold...")
-    gold_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=OANDA:XAUUSD&interval=240", "gold")
+    gold_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=OANDA:XAUUSD&interval=240&studies_overrides=%7B%22RSI.plot%22%3A%7B%22display%22%3A15%7D%7D", "gold")
     
     if gold_path:
         price_text = f"~${gold_price:,.2f} (see chart)" if gold_price else "See chart"
-        caption = f"""📊 <b>Gold (XAU/USD) - 4H</b>
+        caption = f"""📊 <b>Gold (XAU/USD) - 4H + RSI</b>
 
 💰 Price: <b>{price_text}</b>
 🕐 {datetime.now().strftime('%H:%M UTC')}"""
@@ -263,11 +263,11 @@ def job():
     
     # 3. BITCOIN
     print("\n3/4 Processing Bitcoin...")
-    btc_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=BITSTAMP:BTCUSD&interval=240", "bitcoin")
+    btc_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=BITSTAMP:BTCUSD&interval=240&studies_overrides=%7B%22RSI.plot%22%3A%7B%22display%22%3A15%7D%7D", "bitcoin")
     
     if btc_path:
         price_text = f"~${btc_price:,.0f} (see chart)" if btc_price else "See chart"
-        caption = f"""📊 <b>Bitcoin (BTC/USD) - 4H</b>
+        caption = f"""📊 <b>Bitcoin (BTC/USD) - 4H + RSI</b>
 
 💰 Price: <b>{price_text}</b>
 🕐 {datetime.now().strftime('%H:%M UTC')}"""
@@ -277,11 +277,11 @@ def job():
     
     # 4. MONERO
     print("\n4/4 Processing Monero...")
-    xmr_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=KRAKEN:XMRUSD&interval=240", "monero")
+    xmr_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=KRAKEN:XMRUSD&interval=240&studies_overrides=%7B%22RSI.plot%22%3A%7B%22display%22%3A15%7D%7D", "monero")
     
     if xmr_path:
         price_text = f"~${xmr_price:,.2f} (see chart)" if xmr_price else "See chart"
-        caption = f"""📊 <b>Monero (XMR/USD) - 4H</b>
+        caption = f"""📊 <b>Monero (XMR/USD) - 4H + RSI</b>
 
 💰 Price: <b>{price_text}</b>
 🕐 {datetime.now().strftime('%H:%M UTC')}"""
