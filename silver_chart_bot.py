@@ -220,44 +220,86 @@ def main():
     print("="*70)
     print("🤖 SILVER CHART BOT - STARTER TIER")
     print("="*70)
+    print("Step 1: Starting...")
     
     # Start Flask FIRST (Render needs this)
+    print("Step 2: Creating Flask thread...")
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     print("✓ Flask web server started")
     
     # Give Flask 1 second to bind to port
+    print("Step 3: Waiting for Flask to bind...")
     time.sleep(1)
+    print("✓ Flask should be ready")
     
-    print(f"📱 Group Chat ID: {CHAT_ID}")
-    print(f"⏰ Update Frequency: Every 3 minutes")
-    print(f"📊 Chart: TradingView 4H (via Selenium)")
+    print(f"Step 4: Configuration:")
+    print(f"   📱 Group Chat ID: {CHAT_ID}")
+    print(f"   🤖 Bot Token: {BOT_TOKEN[:20]}...")
+    print(f"   ⏰ Update Frequency: Every 3 minutes")
+    print(f"   📊 Chart: TradingView 4H (via Selenium)")
     
     # Send startup message ASAP
-    print("\n📱 Sending startup notification...")
+    print("\nStep 5: Sending startup notification...")
     try:
-        send_message_to_telegram("🤖 Silver Bot started! First chart in 1 minute...")
-        print("✓ Startup message sent")
+        result = send_message_to_telegram("🤖 Silver Bot started! First chart in 1 minute...")
+        if result:
+            print("✓ Startup message sent successfully")
+        else:
+            print("✗ Startup message failed")
     except Exception as e:
-        print(f"✗ Error sending startup: {e}")
+        print(f"✗ Error sending startup: {type(e).__name__}: {e}")
     
     # Schedule the job (don't run immediately to avoid timeout)
+    print("\nStep 6: Setting up schedule...")
     schedule.every(3).minutes.do(job)
+    print("✓ Schedule created (every 3 minutes)")
     
     # Wait a bit before first chart
-    print("⏳ Waiting 60 seconds before first chart capture...")
-    time.sleep(60)
+    print("\nStep 7: Waiting 60 seconds before first chart capture...")
+    for i in range(6):
+        time.sleep(10)
+        print(f"   ... {(i+1)*10} seconds elapsed")
+    print("✓ Wait complete")
     
     # Now run first chart
-    print("🚀 Running first chart capture...")
+    print("\nStep 8: Running first chart capture...")
     job()
+    print("✓ First chart attempt complete")
     
-    print("\n✓ Bot is now running normally...\n")
+    print("\nStep 9: Entering main loop...")
+    print("✓ Bot is now running normally\n")
     
+    loop_count = 0
     while True:
         schedule.run_pending()
         time.sleep(1)
+        loop_count += 1
+        if loop_count % 60 == 0:  # Print every minute
+            print(f"   [Loop alive: {loop_count//60} minutes running]")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"\n{'='*70}")
+        print(f"❌ FATAL ERROR IN MAIN:")
+        print(f"{'='*70}")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        import traceback
+        print(f"\nFull traceback:")
+        print(traceback.format_exc())
+        print(f"{'='*70}\n")
+        
+        # Try to send error to Telegram
+        try:
+            send_message_to_telegram(f"❌ Silver bot crashed!\n\nError: {type(e).__name__}: {str(e)}")
+        except:
+            pass
+        
+        # Keep process alive so we can see logs
+        print("Keeping process alive for debugging...")
+        while True:
+            time.sleep(60)
