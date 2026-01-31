@@ -9,7 +9,6 @@ import threading
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-# Force unbuffered output
 sys.stdout.flush()
 sys.stderr.flush()
 
@@ -62,9 +61,26 @@ ASSETS = [
     }
 ]
 
+def get_price_from_api(asset):
+    """Get price from Yahoo Finance"""
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(asset['api_url'], headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            quotes = data['chart']['result'][0]['indicators']['quote'][0]
+            close_prices = [p for p in quotes['close'] if p is not None]
+            if close_prices:
+                price = close_prices[-1]
+                return price
+    except Exception as e:
+        print(f"   API error: {e}")
+    return None
+
 def get_chart_screenshot(asset):
-    """Capture TradingView chart screenshot"""
-    print(f"   📸 Capturing {asset['name']} chart...")
+    """Capture chart screenshot"""
+    print(f"   📸 Capturing {asset['name']} screenshot...")
     
     chrome_options = Options()
     chrome_options.add_argument('--headless')
@@ -79,7 +95,7 @@ def get_chart_screenshot(asset):
     try:
         driver = webdriver.Chrome(options=chrome_options)
         driver.get(asset['url'])
-        time.sleep(12)  # Wait for chart to load
+        time.sleep(12)
         
         screenshot_path = f"/tmp/{asset['name'].lower()}_chart.png"
         driver.save_screenshot(screenshot_path)
@@ -91,31 +107,12 @@ def get_chart_screenshot(asset):
         return None
         
     except Exception as e:
-        print(f"   ✗ {asset['name']} screenshot failed: {e}")
+        print(f"   ✗ Screenshot failed: {e}")
         return None
         
     finally:
         if driver:
             driver.quit()
-
-def get_price_from_api(asset):
-    """Get price from Yahoo Finance API"""
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(asset['api_url'], headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            quotes = data['chart']['result'][0]['indicators']['quote'][0]
-            close_prices = [p for p in quotes['close'] if p is not None]
-            if close_prices:
-                price = close_prices[-1]
-                print(f"   ✓ {asset['name']} API price: ${price:,.2f}")
-                return price
-    except Exception as e:
-        print(f"   ✗ {asset['name']} API failed: {e}")
-    
-    return None
 
 def send_photo_to_telegram(image_path, caption):
     """Send photo to Telegram"""
@@ -128,100 +125,73 @@ def send_photo_to_telegram(image_path, caption):
             response = requests.post(url, files=files, data=data, timeout=30)
             return response.status_code == 200
     except Exception as e:
-        print(f"   ✗ Telegram error: {e}")
+        print(f"   ✗ Send failed: {e}")
         return False
 
-def send_media_group(images_and_captions):
-    """Send multiple photos as a media group"""
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
-    
+def send_message(text):
+    """Send text message"""
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    data = {'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'HTML'}
     try:
-        media = []
-        files = {}
-        
-        for i, (image_path, caption) in enumerate(images_and_captions):
-            attach_name = f"photo{i}"
-            media.append({
-                'type': 'photo',
-                'media': f'attach://{attach_name}',
-                'caption': caption,
-                'parse_mode': 'HTML'
-            })
-            files[attach_name] = open(image_path, 'rb')
-        
-        data = {
-            'chat_id': CHAT_ID,
-            'media': str(media).replace("'", '"')
-        }
-        
-        response = requests.post(url, data=data, files=files, timeout=60)
-        
-        # Close all file handles
-        for f in files.values():
-            f.close()
-        
-        if response.status_code == 200:
-            print("   ✓ Media group sent!")
-            return True
-        else:
-            print(f"   ✗ Media group failed: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"   ✗ Media group error: {e}")
+        response = requests.post(url, data=data, timeout=10)
+        return response.status_code == 200
+    except:
         return False
 
 def job():
-    """Main job - capture all charts and send together"""
+    """Process all 4 assets and send consecutively"""
     try:
-        print(f"\n{'='*70}")
-        print(f"📊 MULTI-ASSET UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print('='*70)
+        print(f"\n{'='*60}")
+        print(f"📊 UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print('='*60)
         
-        charts_data = []
-        
-        # Process each asset
-        for asset in ASSETS:
-            print(f"\n🔄 Processing {asset['name']}...")
+        # Process each asset one by one
+        for i, asset in enumerate(ASSETS, 1):
+            print(f"\n[{i}/4] Processing {asset['name']}...")
             
-            # Get price from API
+            # Get price
             price = get_price_from_api(asset)
             
-            # Get chart screenshot
+            # Get screenshot
             screenshot_path = get_chart_screenshot(asset)
             
             if screenshot_path and os.path.exists(screenshot_path):
                 # Create caption
                 if price:
-                    price_text = f"~${price:,.2f}"
-                    price_note = " (see chart for exact)"
+                    if asset['name'] == 'Bitcoin':
+                        price_text = f"~${price:,.0f}"
+                    else:
+                        price_text = f"~${price:,.2f}"
+                    price_note = " (see chart)"
                 else:
                     price_text = "See chart"
                     price_note = ""
                 
                 caption = f"""📊 <b>{asset['name']} ({asset['symbol']}) - 4H</b>
+
 💰 Price: <b>{price_text}</b>{price_note}
 🕐 {datetime.now().strftime('%H:%M UTC')}"""
                 
-                charts_data.append((screenshot_path, caption))
-            else:
-                print(f"   ⚠ Skipping {asset['name']} - no screenshot")
-        
-        # Send all charts as media group
-        if charts_data:
-            print(f"\n📤 Sending {len(charts_data)} charts as media group...")
-            send_media_group(charts_data)
-            
-            # Cleanup
-            for screenshot_path, _ in charts_data:
+                # Send immediately
+                print(f"   📤 Sending {asset['name']}...")
+                if send_photo_to_telegram(screenshot_path, caption):
+                    print(f"   ✓ {asset['name']} sent!")
+                else:
+                    print(f"   ✗ {asset['name']} send failed")
+                
+                # Cleanup
                 try:
                     os.remove(screenshot_path)
                 except:
                     pass
-        else:
-            print("   ⚠ No charts to send")
+                
+                # Small delay between messages (1 second)
+                if i < len(ASSETS):
+                    time.sleep(1)
+            else:
+                print(f"   ⚠ Skipping {asset['name']} - no screenshot")
         
-        print("\n✓ Update complete\n")
+        print("\n✓ All assets processed\n")
         
     except Exception as e:
         print(f"❌ ERROR: {e}")
@@ -229,17 +199,14 @@ def job():
         print(traceback.format_exc())
 
 def main():
-    print("="*70)
-    print("🤖 MULTI-ASSET CHART BOT")
-    print("="*70)
-    print("Step 1: Initializing...")
+    print("="*60)
+    print("🤖 MULTI-ASSET CHART BOT (Sequential)")
+    print("="*60)
     print("Assets: Silver, Gold, Bitcoin, Monero")
     print(f"Chat ID: {CHAT_ID}")
-    print(f"Frequency: Every 3 minutes")
-    print("="*70 + "\n")
+    print("="*60 + "\n")
     
     # Start Flask
-    print("Step 2: Starting Flask...")
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
@@ -247,52 +214,30 @@ def main():
     
     time.sleep(2)
     
-    # Send startup message
-    print("Step 3: Sending startup message...")
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        data = {
-            'chat_id': CHAT_ID,
-            'text': '🤖 Multi-Asset Bot started!\n\n📊 Tracking:\n• Silver\n• Gold\n• Bitcoin\n• Monero\n\nFirst charts in 1 minute...',
-            'parse_mode': 'HTML'
-        }
-        response = requests.post(url, data=data, timeout=10)
-        if response.status_code == 200:
-            print("✓ Startup message sent")
-        else:
-            print(f"✗ Startup message failed: {response.status_code}")
-    except Exception as e:
-        print(f"✗ Startup message error: {e}")
+    # Send startup
+    send_message("🤖 Multi-Asset Bot started!\n\n📊 Silver, Gold, Bitcoin, Monero\n\nFirst charts in 1 minute...")
     
-    # Schedule
-    print("\nStep 4: Setting up schedule...")
+    # Schedule every 3 minutes
     schedule.every(3).minutes.do(job)
-    print("✓ Schedule created")
     
-    # Wait then run first job
-    print("\nStep 5: Waiting 60 seconds before first update...")
-    for i in range(6):
-        time.sleep(10)
-        print(f"   ... {(i+1)*10} seconds")
+    # Wait 60 seconds then run first
+    print("⏳ Waiting 60 seconds...")
+    time.sleep(60)
     
-    print("\nStep 6: Running first update...")
+    print("🚀 Running first update...\n")
     job()
     
-    print("\n✓ Entering main loop...\n")
+    print("✓ Bot running\n")
     
-    loop_count = 0
     while True:
         schedule.run_pending()
         time.sleep(1)
-        loop_count += 1
-        if loop_count % 60 == 0:
-            print(f"   [Loop alive: {loop_count//60} min]")
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"FATAL ERROR: {e}")
+        print(f"FATAL: {e}")
         import traceback
         print(traceback.format_exc())
         while True:
