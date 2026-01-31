@@ -232,12 +232,14 @@ def main():
     print("="*70)
     print("🤖 MULTI-ASSET CHART BOT")
     print("="*70)
+    print("Step 1: Initializing...")
     print("Assets: Silver, Gold, Bitcoin, Monero")
     print(f"Chat ID: {CHAT_ID}")
     print(f"Frequency: Every 3 minutes")
     print("="*70 + "\n")
     
     # Start Flask
+    print("Step 2: Starting Flask...")
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
@@ -246,29 +248,45 @@ def main():
     time.sleep(2)
     
     # Send startup message
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    data = {
-        'chat_id': CHAT_ID,
-        'text': '🤖 Multi-Asset Bot started!\n\n📊 Tracking:\n• Silver\n• Gold\n• Bitcoin\n• Monero\n\nFirst charts in 1 minute...',
-        'parse_mode': 'HTML'
-    }
-    requests.post(url, data=data)
+    print("Step 3: Sending startup message...")
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = {
+            'chat_id': CHAT_ID,
+            'text': '🤖 Multi-Asset Bot started!\n\n📊 Tracking:\n• Silver\n• Gold\n• Bitcoin\n• Monero\n\nFirst charts in 1 minute...',
+            'parse_mode': 'HTML'
+        }
+        response = requests.post(url, data=data, timeout=10)
+        if response.status_code == 200:
+            print("✓ Startup message sent")
+        else:
+            print(f"✗ Startup message failed: {response.status_code}")
+    except Exception as e:
+        print(f"✗ Startup message error: {e}")
     
     # Schedule
+    print("\nStep 4: Setting up schedule...")
     schedule.every(3).minutes.do(job)
+    print("✓ Schedule created")
     
     # Wait then run first job
-    print("⏳ Waiting 60 seconds before first update...")
-    time.sleep(60)
+    print("\nStep 5: Waiting 60 seconds before first update...")
+    for i in range(6):
+        time.sleep(10)
+        print(f"   ... {(i+1)*10} seconds")
     
-    print("🚀 Running first update...")
+    print("\nStep 6: Running first update...")
     job()
     
-    print("✓ Entering main loop...\n")
+    print("\n✓ Entering main loop...\n")
     
+    loop_count = 0
     while True:
         schedule.run_pending()
         time.sleep(1)
+        loop_count += 1
+        if loop_count % 60 == 0:
+            print(f"   [Loop alive: {loop_count//60} min]")
 
 if __name__ == "__main__":
     try:
