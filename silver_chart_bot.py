@@ -29,59 +29,76 @@ def run_flask():
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8355694996:AAE5aAFeeA1kFYiQIIe0coD_JdQQ3d6jROA')
 CHAT_ID = os.environ.get('CHAT_ID', '-5232036612')
 
-# Asset configurations
-ASSETS = [
-    {
-        'name': 'Silver',
-        'symbol': 'XAG/USD',
-        'url': 'https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240',
-        'api_url': 'https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1m&range=1d',
-        'price_range': (20, 100)
-    },
-    {
-        'name': 'Gold',
-        'symbol': 'XAU/USD',
-        'url': 'https://www.tradingview.com/chart/?symbol=OANDA:XAUUSD&interval=240',
-        'api_url': 'https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d',
-        'price_range': (1500, 3000)
-    },
-    {
-        'name': 'Bitcoin',
-        'symbol': 'BTC/USD',
-        'url': 'https://www.tradingview.com/chart/?symbol=BITSTAMP:BTCUSD&interval=240',
-        'api_url': 'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=1m&range=1d',
-        'price_range': (10000, 150000)
-    },
-    {
-        'name': 'Monero',
-        'symbol': 'XMR/USD',
-        'url': 'https://www.tradingview.com/chart/?symbol=KRAKEN:XMRUSD&interval=240',
-        'api_url': 'https://query1.finance.yahoo.com/v8/finance/chart/XMR-USD?interval=1m&range=1d',
-        'price_range': (50, 1000)
-    }
-]
-
-def get_price_from_api(asset):
-    """Get price from Yahoo Finance"""
+def get_silver_price():
+    """Get current silver price from Yahoo Finance"""
     try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1m&range=1d"
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(asset['api_url'], headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
             quotes = data['chart']['result'][0]['indicators']['quote'][0]
             close_prices = [p for p in quotes['close'] if p is not None]
             if close_prices:
-                price = close_prices[-1]
-                return price
-    except Exception as e:
-        print(f"   API error: {e}")
+                return close_prices[-1]
+    except:
+        pass
     return None
 
-def get_chart_screenshot(asset):
+def get_gold_price():
+    """Get current gold price"""
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            quotes = data['chart']['result'][0]['indicators']['quote'][0]
+            close_prices = [p for p in quotes['close'] if p is not None]
+            if close_prices:
+                return close_prices[-1]
+    except:
+        pass
+    return None
+
+def get_bitcoin_price():
+    """Get current Bitcoin price"""
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=1m&range=1d"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            quotes = data['chart']['result'][0]['indicators']['quote'][0]
+            close_prices = [p for p in quotes['close'] if p is not None]
+            if close_prices:
+                return close_prices[-1]
+    except:
+        pass
+    return None
+
+def get_monero_price():
+    """Get current Monero price"""
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/XMR-USD?interval=1m&range=1d"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            quotes = data['chart']['result'][0]['indicators']['quote'][0]
+            close_prices = [p for p in quotes['close'] if p is not None]
+            if close_prices:
+                return close_prices[-1]
+    except:
+        pass
+    return None
+
+def get_chart_screenshot(url, name):
     """Capture chart screenshot"""
-    print(f"   📸 Capturing {asset['name']} screenshot...")
-    
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
@@ -94,20 +111,18 @@ def get_chart_screenshot(asset):
     
     try:
         driver = webdriver.Chrome(options=chrome_options)
-        driver.get(asset['url'])
+        driver.get(url)
         time.sleep(12)
         
-        screenshot_path = f"/tmp/{asset['name'].lower()}_chart.png"
+        screenshot_path = f"/tmp/{name.lower()}_chart.png"
         driver.save_screenshot(screenshot_path)
         
         if os.path.exists(screenshot_path):
-            print(f"   ✓ {asset['name']} screenshot saved")
             return screenshot_path
-        
         return None
         
     except Exception as e:
-        print(f"   ✗ Screenshot failed: {e}")
+        print(f"Screenshot error for {name}: {e}")
         return None
         
     finally:
@@ -125,13 +140,13 @@ def send_photo_to_telegram(image_path, caption):
             response = requests.post(url, files=files, data=data, timeout=30)
             return response.status_code == 200
     except Exception as e:
-        print(f"   ✗ Send failed: {e}")
+        print(f"Telegram error: {e}")
         return False
 
-def send_message(text):
+def send_message_to_telegram(message):
     """Send text message"""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    data = {'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'HTML'}
+    data = {'chat_id': CHAT_ID, 'text': message, 'parse_mode': 'HTML'}
     try:
         response = requests.post(url, data=data, timeout=10)
         return response.status_code == 200
@@ -139,106 +154,91 @@ def send_message(text):
         return False
 
 def job():
-    """Process all 4 assets and send consecutively"""
-    try:
-        print(f"\n{'='*60}")
-        print(f"📊 UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print('='*60)
-        
-        # Process each asset one by one
-        for i, asset in enumerate(ASSETS, 1):
-            print(f"\n[{i}/4] Processing {asset['name']}...")
-            
-            # Get price
-            price = get_price_from_api(asset)
-            
-            # Get screenshot
-            screenshot_path = get_chart_screenshot(asset)
-            
-            if screenshot_path and os.path.exists(screenshot_path):
-                # Create caption
-                if price:
-                    if asset['name'] == 'Bitcoin':
-                        price_text = f"~${price:,.0f}"
-                    else:
-                        price_text = f"~${price:,.2f}"
-                    price_note = " (see chart)"
-                else:
-                    price_text = "See chart"
-                    price_note = ""
-                
-                caption = f"""📊 <b>{asset['name']} ({asset['symbol']}) - 4H</b>
+    """Main job - send all 4 charts"""
+    print(f"\n{'='*60}")
+    print(f"UPDATE - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print('='*60)
+    
+    # 1. SILVER
+    print("\n1/4 Processing Silver...")
+    silver_price = get_silver_price()
+    silver_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=TVC:SILVER&interval=240", "silver")
+    
+    if silver_path:
+        price_text = f"~${silver_price:.2f} (see chart)" if silver_price else "See chart"
+        caption = f"""📊 <b>Silver (XAG/USD) - 4H</b>
 
-💰 Price: <b>{price_text}</b>{price_note}
+💰 Price: <b>{price_text}</b>
 🕐 {datetime.now().strftime('%H:%M UTC')}"""
-                
-                # Send immediately
-                print(f"   📤 Sending {asset['name']}...")
-                if send_photo_to_telegram(screenshot_path, caption):
-                    print(f"   ✓ {asset['name']} sent!")
-                else:
-                    print(f"   ✗ {asset['name']} send failed")
-                
-                # Cleanup
-                try:
-                    os.remove(screenshot_path)
-                except:
-                    pass
-                
-                # Small delay between messages (1 second)
-                if i < len(ASSETS):
-                    time.sleep(1)
-            else:
-                print(f"   ⚠ Skipping {asset['name']} - no screenshot")
-        
-        print("\n✓ All assets processed\n")
-        
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
-        import traceback
-        print(traceback.format_exc())
+        send_photo_to_telegram(silver_path, caption)
+        os.remove(silver_path)
+        time.sleep(1)
+    
+    # 2. GOLD
+    print("\n2/4 Processing Gold...")
+    gold_price = get_gold_price()
+    gold_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=OANDA:XAUUSD&interval=240", "gold")
+    
+    if gold_path:
+        price_text = f"~${gold_price:,.2f} (see chart)" if gold_price else "See chart"
+        caption = f"""📊 <b>Gold (XAU/USD) - 4H</b>
+
+💰 Price: <b>{price_text}</b>
+🕐 {datetime.now().strftime('%H:%M UTC')}"""
+        send_photo_to_telegram(gold_path, caption)
+        os.remove(gold_path)
+        time.sleep(1)
+    
+    # 3. BITCOIN
+    print("\n3/4 Processing Bitcoin...")
+    btc_price = get_bitcoin_price()
+    btc_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=BITSTAMP:BTCUSD&interval=240", "bitcoin")
+    
+    if btc_path:
+        price_text = f"~${btc_price:,.0f} (see chart)" if btc_price else "See chart"
+        caption = f"""📊 <b>Bitcoin (BTC/USD) - 4H</b>
+
+💰 Price: <b>{price_text}</b>
+🕐 {datetime.now().strftime('%H:%M UTC')}"""
+        send_photo_to_telegram(btc_path, caption)
+        os.remove(btc_path)
+        time.sleep(1)
+    
+    # 4. MONERO
+    print("\n4/4 Processing Monero...")
+    xmr_price = get_monero_price()
+    xmr_path = get_chart_screenshot("https://www.tradingview.com/chart/?symbol=KRAKEN:XMRUSD&interval=240", "monero")
+    
+    if xmr_path:
+        price_text = f"~${xmr_price:,.2f} (see chart)" if xmr_price else "See chart"
+        caption = f"""📊 <b>Monero (XMR/USD) - 4H</b>
+
+💰 Price: <b>{price_text}</b>
+🕐 {datetime.now().strftime('%H:%M UTC')}"""
+        send_photo_to_telegram(xmr_path, caption)
+        os.remove(xmr_path)
+    
+    print("\n✓ Update complete\n")
 
 def main():
-    print("="*60)
-    print("🤖 MULTI-ASSET CHART BOT (Sequential)")
-    print("="*60)
-    print("Assets: Silver, Gold, Bitcoin, Monero")
-    print(f"Chat ID: {CHAT_ID}")
-    print("="*60 + "\n")
+    print("Multi-Asset Chart Bot Started")
     
-    # Start Flask
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    print("✓ Flask started\n")
     
     time.sleep(2)
     
-    # Send startup
-    send_message("🤖 Multi-Asset Bot started!\n\n📊 Silver, Gold, Bitcoin, Monero\n\nFirst charts in 1 minute...")
+    send_message_to_telegram("🤖 Multi-Asset Bot started!\n\n📊 Silver, Gold, Bitcoin, Monero\n\nFirst charts in 1 minute...")
     
-    # Schedule every 3 minutes
     schedule.every(3).minutes.do(job)
     
-    # Wait 60 seconds then run first
-    print("⏳ Waiting 60 seconds...")
     time.sleep(60)
-    
-    print("🚀 Running first update...\n")
     job()
-    
-    print("✓ Bot running\n")
     
     while True:
         schedule.run_pending()
         time.sleep(1)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"FATAL: {e}")
-        import traceback
-        print(traceback.format_exc())
-        while True:
-            time.sleep(60)
+    main()
