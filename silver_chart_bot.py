@@ -70,7 +70,7 @@ def extract_price_from_screenshot(image_path):
     return None
 
 def get_chart_screenshot():
-    """Capture TradingView chart screenshot using Selenium"""
+    """Capture TradingView chart screenshot using Selenium and extract price"""
     print("📸 Capturing TradingView screenshot...")
     
     chrome_options = Options()
@@ -83,6 +83,7 @@ def get_chart_screenshot():
     chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
     
     driver = None
+    extracted_price = None
     
     try:
         print("   Starting Chrome...")
@@ -100,6 +101,36 @@ def get_chart_screenshot():
         print("   Waiting 12 seconds for chart to render...")
         time.sleep(12)
         
+        # Try to extract price from page source
+        try:
+            print("   🔍 Extracting price from page...")
+            import re
+            page_source = driver.page_source
+            
+            # Look for price patterns in page source
+            # TradingView embeds price in various places
+            price_patterns = [
+                r'"last":(\d{2,3}\.\d{2,4})',  # JSON data
+                r'"close":(\d{2,3}\.\d{2,4})',  # Close price
+                r'data-value="(\d{2,3}\.\d{2,4})"',  # Data attribute
+                r'>(\d{2,3}\.\d{2,4})<',  # Direct text
+            ]
+            
+            for pattern in price_patterns:
+                matches = re.findall(pattern, page_source)
+                if matches:
+                    for match in matches:
+                        price = float(match)
+                        if 20 < price < 100:  # Silver range
+                            extracted_price = price
+                            print(f"   ✓ Extracted price from page: ${price:.2f}")
+                            break
+                if extracted_price:
+                    break
+                    
+        except Exception as e:
+            print(f"   ⚠ Price extraction from page failed: {e}")
+        
         # Take screenshot
         screenshot_path = '/tmp/silver_chart.png'
         print(f"   Taking screenshot to {screenshot_path}")
@@ -109,16 +140,16 @@ def get_chart_screenshot():
         if os.path.exists(screenshot_path):
             file_size = os.path.getsize(screenshot_path)
             print(f"   ✓ Screenshot saved! Size: {file_size} bytes")
-            return screenshot_path
+            return screenshot_path, extracted_price
         else:
             print("   ✗ Screenshot file not found!")
-            return None
+            return None, None
         
     except Exception as e:
         print(f"   ✗ Error: {type(e).__name__}: {str(e)}")
         import traceback
         print(f"   Traceback: {traceback.format_exc()}")
-        return None
+        return None, None
         
     finally:
         if driver:
@@ -285,18 +316,13 @@ def job():
             price_text = f"${price:.2f}"
             print(f"💰 Current Silver Price: ${price:.2f}")
         
-        # Capture chart screenshot
-        screenshot_path = get_chart_screenshot()
+        # Capture chart screenshot (returns screenshot_path AND extracted price)
+        screenshot_path, chart_price = get_chart_screenshot()
         
-        # Try to extract exact price from screenshot first
-        screenshot_price = None
-        if screenshot_path and os.path.exists(screenshot_path):
-            screenshot_price = extract_price_from_screenshot(screenshot_path)
-        
-        # Use screenshot price if available, otherwise use API price
-        if screenshot_price:
-            price_text = f"${screenshot_price:.2f}"
-            print(f"💰 Using exact price from chart: ${screenshot_price:.2f}")
+        # Use chart price if available, otherwise API price
+        if chart_price:
+            price_text = f"${chart_price:.2f}"
+            print(f"💰 Using exact price from TradingView: ${chart_price:.2f}")
         elif price:
             price_text = f"${price:.2f}"
             print(f"💰 Using API price: ${price:.2f}")
