@@ -192,35 +192,40 @@ def main():
     print("="*70)
     print("🤖 SILVER CHART BOT - STARTER TIER")
     print("="*70)
-    print(f"📱 Group Chat ID: {CHAT_ID}")
-    print(f"⏰ Update Frequency: Every 3 minutes")
-    print(f"📊 Chart: TradingView 4H (via Selenium)")
-    print(f"🖥️  Instance: Always-on (no sleeping)")
-    print("="*70 + "\n")
     
-    # Start Flask in background thread
+    # Start Flask FIRST (Render needs this)
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    print("✓ Flask web server started\n")
+    print("✓ Flask web server started")
     
-    # Wait for Flask to start
-    time.sleep(2)
+    # Give Flask 1 second to bind to port
+    time.sleep(1)
     
-    # Send startup message IMMEDIATELY (before first chart)
-    print("📱 Sending startup notification...")
-    send_message_to_telegram("🤖 <b>Silver Chart Bot is now active!</b>\n\n📊 First chart coming in 30 seconds...\n💰 Then updates every 3 minutes")
+    print(f"📱 Group Chat ID: {CHAT_ID}")
+    print(f"⏰ Update Frequency: Every 3 minutes")
+    print(f"📊 Chart: TradingView 4H (via Selenium)")
     
-    print("✓ Bot is ready, starting first chart capture...\n")
+    # Send startup message ASAP
+    print("\n📱 Sending startup notification...")
+    try:
+        send_message_to_telegram("🤖 Silver Bot started! First chart in 1 minute...")
+        print("✓ Startup message sent")
+    except Exception as e:
+        print(f"✗ Error sending startup: {e}")
     
-    # Run first job after startup message sent
-    time.sleep(5)  # Small delay to ensure startup message sent first
-    job()
-    
-    # Schedule to run every 3 minutes
+    # Schedule the job (don't run immediately to avoid timeout)
     schedule.every(3).minutes.do(job)
     
-    print("✓ Bot is now running and will update every 3 minutes...\n")
+    # Wait a bit before first chart
+    print("⏳ Waiting 60 seconds before first chart capture...")
+    time.sleep(60)
+    
+    # Now run first chart
+    print("🚀 Running first chart capture...")
+    job()
+    
+    print("\n✓ Bot is now running normally...\n")
     
     while True:
         schedule.run_pending()
