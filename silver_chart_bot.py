@@ -33,6 +33,42 @@ def run_flask():
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8355694996:AAE5aAFeeA1kFYiQIIe0coD_JdQQ3d6jROA')
 CHAT_ID = os.environ.get('CHAT_ID', '-5232036612')
 
+def extract_price_from_screenshot(image_path):
+    """Extract current price from TradingView screenshot using OCR"""
+    try:
+        print("   🔍 Extracting price from screenshot with OCR...")
+        
+        # Try using pytesseract
+        try:
+            import pytesseract
+            from PIL import Image
+            
+            img = Image.open(image_path)
+            # OCR the image
+            text = pytesseract.image_to_string(img)
+            
+            # Look for price pattern in OCR text
+            import re
+            # TradingView shows price prominently at top
+            matches = re.findall(r'(\d{2,3}\.\d{2,4})', text)
+            
+            if matches:
+                # Get the first reasonable silver price
+                for match in matches:
+                    price = float(match)
+                    if 20 < price < 100:  # Silver price range
+                        print(f"   ✓ Extracted price from chart: ${price:.2f}")
+                        return price
+        except ImportError:
+            print("   ⚠ pytesseract not available, skipping OCR")
+        except Exception as e:
+            print(f"   ⚠ OCR failed: {e}")
+        
+    except Exception as e:
+        print(f"   ✗ Screenshot price extraction failed: {e}")
+    
+    return None
+
 def get_chart_screenshot():
     """Capture TradingView chart screenshot using Selenium"""
     print("📸 Capturing TradingView screenshot...")
@@ -142,82 +178,87 @@ def send_message_to_telegram(message):
 def get_silver_price():
     """Get current silver price from multiple sources"""
     
+    print(f"   [Price fetch started at {datetime.now().strftime('%H:%M:%S')}]")
+    
     # Try Yahoo Finance first
     try:
         print("   Trying Yahoo Finance...")
-        url = "https://query1.finance.yahoo.com/v8/finance/chart/SI=F"
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1m&range=1d"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
+            # Try to get most recent 1-minute quote
+            quotes = data['chart']['result'][0]['indicators']['quote'][0]
+            close_prices = [p for p in quotes['close'] if p is not None]
+            if close_prices:
+                price = close_prices[-1]  # Most recent price
+                print(f"   ✓ Yahoo Finance (1m): ${price:.2f}")
+                return price
+            # Fallback to regular market price
             price = data['chart']['result'][0]['meta']['regularMarketPrice']
-            print(f"   ✓ Yahoo Finance: ${price:.2f}")
+            timestamp = data['chart']['result'][0]['meta'].get('regularMarketTime', 'unknown')
+            print(f"   ✓ Yahoo Finance: ${price:.2f} (timestamp: {timestamp})")
             return price
     except Exception as e:
-        print(f"   ✗ Yahoo Finance failed: {e}")
+        print(f"   ✗ Yahoo Finance failed: {type(e).__name__}: {str(e)[:100]}")
     
-    # Try Metals-API.com (free tier)
+    # Try alternative - live gold/silver API
     try:
-        print("   Trying Metals-API...")
-        url = "https://metals-api.com/api/latest?access_key=freeapikey&base=USD&symbols=XAG"
-        response = requests.get(url, timeout=10)
+        print("   Trying GoldAPI.io...")
+        url = "https://www.goldapi.io/api/XAG/USD"
+        headers = {"x-access-token": "goldapi-demo"}
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
-            if data.get('success'):
-                xag_rate = data['rates']['XAG']
-                price = 1 / xag_rate
-                print(f"   ✓ Metals-API: ${price:.2f}")
+            price = data.get('price', 0)
+            if price > 0:
+                print(f"   ✓ GoldAPI: ${price:.2f}")
                 return price
     except Exception as e:
-        print(f"   ✗ Metals-API failed: {e}")
+        print(f"   ✗ GoldAPI failed: {type(e).__name__}: {str(e)[:100]}")
     
-    # Try direct Kitco scraping
+    # Try Kitco (most reliable, real-time)
     try:
-        print("   Trying Kitco...")
+        print("   Trying Kitco.com...")
         url = "https://www.kitco.com/market/silver"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
-            # Look for price in HTML
             import re
             text = response.text
-            # Find patterns like "$32.45" or "32.45"
-            matches = re.findall(r'\$?(\d{2,3}\.\d{2})', text)
+            # Kitco shows price prominently
+            matches = re.findall(r'[\$]?(\d{2,3}\.\d{2})', text[:5000])  # Search first 5000 chars
             if matches:
-                # Get first reasonable silver price (between $15 and $50)
                 for match in matches:
                     price = float(match)
-                    if 15 < price < 50:
+                    if 20 < price < 100:  # Silver range
                         print(f"   ✓ Kitco: ${price:.2f}")
                         return price
     except Exception as e:
-        print(f"   ✗ Kitco failed: {e}")
+        print(f"   ✗ Kitco failed: {type(e).__name__}: {str(e)[:100]}")
     
-    # Try Investing.com API
+    # Try BullionVault (real-time spot)
     try:
-        print("   Trying Investing.com...")
-        url = "https://www.investing.com/commodities/silver"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
+        print("   Trying BullionVault...")
+        url = "https://www.bullionvault.com/silver-price-chart.do"
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             import re
-            # Look for silver price
-            matches = re.findall(r'data-test="instrument-price-last">([0-9,.]+)', response.text)
+            # Look for spot price
+            matches = re.findall(r'spot.*?(\d{2,3}\.\d{2})', response.text, re.IGNORECASE)
             if matches:
-                price_str = matches[0].replace(',', '')
-                price = float(price_str)
-                if 15 < price < 50:
-                    print(f"   ✓ Investing.com: ${price:.2f}")
+                price = float(matches[0])
+                if 20 < price < 100:
+                    print(f"   ✓ BullionVault: ${price:.2f}")
                     return price
     except Exception as e:
-        print(f"   ✗ Investing.com failed: {e}")
+        print(f"   ✗ BullionVault failed: {type(e).__name__}: {str(e)[:100]}")
     
     # All sources failed
     print("   ✗ All price sources failed")
@@ -246,6 +287,22 @@ def job():
         
         # Capture chart screenshot
         screenshot_path = get_chart_screenshot()
+        
+        # Try to extract exact price from screenshot first
+        screenshot_price = None
+        if screenshot_path and os.path.exists(screenshot_path):
+            screenshot_price = extract_price_from_screenshot(screenshot_path)
+        
+        # Use screenshot price if available, otherwise use API price
+        if screenshot_price:
+            price_text = f"${screenshot_price:.2f}"
+            print(f"💰 Using exact price from chart: ${screenshot_price:.2f}")
+        elif price:
+            price_text = f"${price:.2f}"
+            print(f"💰 Using API price: ${price:.2f}")
+        else:
+            price_text = "~$30-32 (see chart)"
+            print(f"   Using placeholder: {price_text}")
         
         if screenshot_path and os.path.exists(screenshot_path):
             # Send photo with price as caption
