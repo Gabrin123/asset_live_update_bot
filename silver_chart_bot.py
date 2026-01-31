@@ -141,7 +141,8 @@ def get_silver_price():
     try:
         print("   Trying Yahoo Finance...")
         url = "https://query1.finance.yahoo.com/v8/finance/chart/SI=F"
-        response = requests.get(url, timeout=10)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
@@ -151,36 +152,67 @@ def get_silver_price():
     except Exception as e:
         print(f"   ✗ Yahoo Finance failed: {e}")
     
-    # Try alternative API
+    # Try Metals-API.com (free tier)
     try:
-        print("   Trying MetalPriceAPI.com...")
-        url = "https://api.metalpriceapi.com/v1/latest?api_key=demo&base=USD&currencies=XAG"
+        print("   Trying Metals-API...")
+        url = "https://metals-api.com/api/latest?access_key=freeapikey&base=USD&symbols=XAG"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
-            # Convert from oz to standard price
-            xag_rate = data['rates']['XAG']
-            price = 1 / xag_rate  # Convert rate to price per oz
-            print(f"   ✓ MetalPriceAPI: ${price:.2f}")
-            return price
+            if data.get('success'):
+                xag_rate = data['rates']['XAG']
+                price = 1 / xag_rate
+                print(f"   ✓ Metals-API: ${price:.2f}")
+                return price
     except Exception as e:
-        print(f"   ✗ MetalPriceAPI failed: {e}")
+        print(f"   ✗ Metals-API failed: {e}")
     
-    # Try GoldAPI
+    # Try direct Kitco scraping
     try:
-        print("   Trying GoldAPI.io...")
-        url = "https://www.goldapi.io/api/XAG/USD"
-        headers = {"x-access-token": "goldapi-demo"}
+        print("   Trying Kitco...")
+        url = "https://www.kitco.com/market/silver"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
-            data = response.json()
-            price = data['price']
-            print(f"   ✓ GoldAPI: ${price:.2f}")
-            return price
+            # Look for price in HTML
+            import re
+            text = response.text
+            # Find patterns like "$32.45" or "32.45"
+            matches = re.findall(r'\$?(\d{2,3}\.\d{2})', text)
+            if matches:
+                # Get first reasonable silver price (between $15 and $50)
+                for match in matches:
+                    price = float(match)
+                    if 15 < price < 50:
+                        print(f"   ✓ Kitco: ${price:.2f}")
+                        return price
     except Exception as e:
-        print(f"   ✗ GoldAPI failed: {e}")
+        print(f"   ✗ Kitco failed: {e}")
+    
+    # Try Investing.com API
+    try:
+        print("   Trying Investing.com...")
+        url = "https://www.investing.com/commodities/silver"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            import re
+            # Look for silver price
+            matches = re.findall(r'data-test="instrument-price-last">([0-9,.]+)', response.text)
+            if matches:
+                price_str = matches[0].replace(',', '')
+                price = float(price_str)
+                if 15 < price < 50:
+                    print(f"   ✓ Investing.com: ${price:.2f}")
+                    return price
+    except Exception as e:
+        print(f"   ✗ Investing.com failed: {e}")
     
     # All sources failed
     print("   ✗ All price sources failed")
